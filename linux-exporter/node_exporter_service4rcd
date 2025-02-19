@@ -1,0 +1,46 @@
+#!/bin/bash
+
+### BEGIN INIT INFO
+# Provides: node_exporter
+# Required-Start: $remote_fs $syslog
+# Required-Stop: $remote_fs $syslog
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: Start node exporter
+# Description : Node exporter start up
+### END INIT INFO
+
+# source function library
+. /lib/lsb/init-functions
+
+
+start() {
+    echo -n "Starting node_exporter:"
+    nohup /usr/local/bin/node_exporter & 
+    return 0
+}
+
+stop() {
+    echo -n "Shutting down node_exporter:"
+    pkill node_exporter &
+    return 0
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status node_exporter
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage node_exporter {start|stop|status|restart}"
+esac
+exit 0

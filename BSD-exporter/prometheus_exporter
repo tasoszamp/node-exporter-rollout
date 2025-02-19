@@ -1,0 +1,133 @@
+#!/bin/bash
+. /etc/rc.subr
+
+
+# Print the HTTP Header
+
+echo "HTTP/1.1 200 OK"
+echo "Connection: close"
+echo "Content-Type: text/plain; version=0.0.4"
+echo
+
+
+# Memory metrics
+
+x=$(sysctl vm.vmtotal)
+read -r -a y <<< $x
+
+echo "# HELP freeBSD_realmem_total_Kbytes Real memory on the system."
+echo "# TYPE freeBSD_realmem_total_Kbytes gauge"
+echo "freeBSD_realmem_total_Kbytes ${y[32]//K}"
+
+echo "# HELP freeBSD_realmem_active_Kbytes Active real memory on the system."
+echo "# TYPE freeBSD_realmem_active_Kbytes gauge"
+echo "freeBSD_realmem_active_Kbytes ${y[34]//K)}"
+
+echo "# HELP freeBSD_virtmem_total_Kbytes Virtual memory on the system."
+echo "# TYPE freeBSD_virtmem_total_Kbytes gauge"
+echo "freeBSD_virtmem_total_Kbytes ${y[26]//K}"
+
+echo "# HELP freeBSD_virtmem_active_Kbytes Active virtual memory on the system."
+echo "# TYPE freeBSD_virtmem_active_Kbytes gauge"
+echo "freeBSD_virtmem_active_Kbytes ${y[28]//K)}"
+
+echo "# HELP freeBSD_freemem_Kbytes Free memory on the system."
+echo "# TYPE freeBSD_freemem_Kbytes gauge"
+echo "freeBSD_freemem_Kbytes ${y[51]//K}"
+
+x=$(swapinfo)
+read -r -a y <<< $x
+
+echo "# HELP freeBSD_swapmem_usage_percentage Swap memory usage percentage."
+echo "# TYPE freeBSD_swapmem_usage_percentage gauge"
+echo "freeBSD_swapmem_usage_percentage ${y[9]//%}"
+
+# CPU metrics
+
+x=$(top -P -q -d 2 -s 1 0)
+read -r -a y <<< $x
+
+length="${#y[@]}"
+if [ "${y[18]}" == "zombie" ] || [ "${y[18]}" == "lock" ]
+then
+    l=2
+    if [ "${y[20]}" == "lock" ]
+    then
+        l=4
+    fi
+else
+    l=0
+fi
+if [ "${y[$((34+$l))]}" == "Free" ]
+then
+    k=0
+elif [ "${y[$((38+$l))]}" == "Inuse" ]
+then
+    k=4
+else
+    k=2
+fi
+if [ "${y[$((53+$l+$k))]}" == "zombie" ] || [ "${y[$((53+$l+$k))]}" == "lock" ]
+then
+    m=2
+    if [ "${y[$((55+$l+$k))]}" == "lock" ]
+    then
+        m=4
+    fi
+else
+    m=0
+fi
+
+cpus="$((($length-70-$k*2-$l*2)/12))"
+
+echo "# HELP freeBSD_cpu_user_percentage CPU percentage on user."
+echo "# TYPE freeBSD_cpu_user_percentage counter"
+for ((i=1;i<=cpus;i++))
+    do
+        echo "freeBSD_cpu_user_percentage{cpu=\"$i\"} ${y[$((12*$i+42+$k+$l+$m))]//%}"
+    done
+
+echo "# HELP freeBSD_cpu_nice_percentage CPU percentage on nice."
+echo "# TYPE freeBSD_cpu_nice_percentage counter"
+for ((i=1;i<=cpus;i++))
+    do
+        echo "freeBSD_cpu_nice_percentage{cpu=\"$i\"} ${y[$((12*$i+46+$k+$l+$m))]//%}"
+    done
+
+echo "# HELP freeBSD_cpu_interrupt_percentage CPU percentage on interrupt."
+echo "# TYPE freeBSD_cpu_interrupt_percentage counter"
+for ((i=1;i<=cpus;i++))
+    do
+        echo "freeBSD_cpu_interrupt_percentage{cpu=\"$i\"} ${y[$((12*$i+48+$k+$l+$m))]//%}"
+    done
+
+echo "# HELP freeBSD_cpu_idle_percentage CPU percentage on idle."
+echo "# TYPE freeBSD_cpu_idle_percentage counter"
+for ((i=1;i<=cpus;i++))
+    do
+        echo "freeBSD_cpu_idle_percentage{cpu=\"$i\"} ${y[$((12*$i+50+$k+$l+$m))]//%}"
+    done
+
+# Drive metrics
+
+x=$(df -h)
+read -r -a y <<< $x
+
+length="${#y[@]}"
+partitions="$((($length-1)/6-1))"
+
+echo "# HELP freeBSD_disk_partition_percentage Disk usage percentage on partitions."
+echo "# TYPE freeBSD_disk_partition_percentage counter"
+for ((i=1;i<=partitions;i++))
+    do
+        echo "freeBSD_disk_partition_percentage{partition=\"${y[$(($i*6+6))]}\"} ${y[$(($i*6+5))]//%}"
+    done
+
+x=$(iostat -I)
+read -r -a y <<< $x
+
+echo "# HELP freeBSD_disk_Mbytes_transferred_total Total number of megabytes transferred."
+echo "# TYPE freeBSD_disk_Mbytes_transferred_total counter"
+echo "freeBSD_disk_Mbytes_transferred_total ${y[17]}"
+
+#x=$(diskinfo -t ad0)

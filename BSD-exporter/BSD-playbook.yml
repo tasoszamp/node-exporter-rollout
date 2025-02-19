@@ -1,0 +1,45 @@
+---
+  - name: BSD rollout
+    hosts: sjc-ci-bsd84
+    user: root
+    vars:
+    tasks:
+
+    - name: Copy exporter
+      copy:
+        src: /root/node_exporter_installation/BSD/prometheus_exporter
+        dest: /usr/local/bin/prometheus_exporter
+        mode: 0755
+
+    - name: Copy exporter start
+      copy:
+        src: /root/node_exporter_installation/BSD/prometheus_exporter_start
+        dest: /usr/local/bin/prometheus_exporter_start
+        mode: 0755
+
+    - name: Add prometheus exporter on inetd configuration
+      lineinfile:
+        path: /etc/inetd.conf
+        line: 'promex stream tcp nowait root /usr/local/bin/prometheus_exporter_start'
+
+    - name: Match prometheus exporter with port 9101
+      lineinfile:
+        path: /etc/services
+        line: 'promex          9101/tcp   #Prometheus exporter'
+        insertafter: '^jetdirect'
+
+    - name: Enable inetd at startup
+      lineinfile:
+        path: /etc/rc.conf
+        regexp: '^inetd_enable'
+        line: 'inetd_enable="YES"'
+
+    - name: Start inetd service
+      service:
+        name: inetd
+        state: started
+    
+    - name: Reload inted service conf
+      service:
+        name: inetd
+        state: reloaded

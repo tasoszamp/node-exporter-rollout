@@ -1,0 +1,42 @@
+#!/bin/bash
+# /etc/rc.d/init.d/node_exporter
+# chkconfig: 345 99 01
+# description: node exporter service
+# processname: node_exporter
+
+# source function library
+. /etc/rc.d/init.d/functions
+
+
+start() {
+    echo -n "Starting node_exporter:"
+    nohup /usr/local/bin/node_exporter &
+    touch /var/lock/subsys/node_exporter
+    return 0
+}
+
+stop() {
+    echo -n "Shutting down node_exporter:"
+    killproc /usr/local/bin/node_exporter &
+    rm -f /var/lock/subsys/node_exporter
+    return 0
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status node_exporter
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage node_exporter {start|stop|status|restart}"
+esac
+exit $?

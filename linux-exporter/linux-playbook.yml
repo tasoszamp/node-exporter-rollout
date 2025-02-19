@@ -1,0 +1,104 @@
+---
+  - name: Linux rollout
+    hosts: <>
+    user: root
+    vars:
+      os_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else '386' }}"
+      node_version: '1.0.1'
+#      node_version: "{{ '1.0.1' if ansible_architecture == 'x86_64' else '0.16.0'}}" 
+      ansible_python_interpreter: auto_legacy
+    tasks:
+
+    - name: Create a new user for node_exporter
+      user:
+        name: node_exporter
+        create_home: no
+        comment: Node exporter user
+        shell: /bin/false/
+    
+#    - name: Make directory for node_exporter
+#      file:
+#        path: /home/node_exporter
+#        state: directory
+
+#    - name: Donwload node_exporter
+#      get_url:
+#        url: https://github.com/prometheus/node_exporter/releases/download/v{{ node_version }}/node_exporter-{{ node_version }}.linux-{{ os_arch }}.tar.gz
+#        dest: /home/node_exporter/
+#        force: no
+
+#    - name: Unpack node_exporter
+#      unarchive:
+#        src: /home/node_exporter/node_exporter-{{ node_version }}.linux-{{ os_arch }}.tar.gz
+#        dest: /home/node_exporter/
+#        remote_src: yes
+
+    - name: Copy to /usr/local/bin
+      copy:
+        src: /root/node_exporter_installation/linux/node_exporter-{{ node_version }}.linux-{{ os_arch }}/node_exporter
+        dest: /usr/local/bin
+#        remote_src: yes
+
+    - name: Assigne ownership
+      file:
+        path: /usr/local/bin/node_exporter
+        owner: node_exporter
+        group: node_exporter
+        mode: 0755
+
+    - name: Check if systemd exists
+      stat:
+        path: /bin/systemd
+      register: systemd_command
+
+    - name: Copy Service File to remote systemd
+      copy:
+        src: /root/node_exporter_installation/linux/node_exporter_systemd.service
+        dest: /etc/systemd/system/node_exporter.service
+      when: systemd_command.stat.exists
+
+    - name: Copy Service File to remote init.d (CentOS < 7)
+      copy:
+        src: /root/node_exporter_installation/linux/node_exporter_centos6.service
+        dest: /etc/init.d/node_exporter
+      when: not systemd_command.stat.exists and ansible_distribution == 'CentOS'
+
+    - name: Copy Service File to remote init.d (Not CentOS < 7)
+      copy:
+        src: /root/node_exporter_installation/linux/node_exporter_initd.service
+        dest: /etc/init.d/node_exporter
+      when: not systemd_command.stat.exists and ansible_distribution == 'CentOS'
+    
+    - name: Start Service with systemd
+      systemd:
+        daemon_reload: yes
+        name: node_exporter.service
+        enabled: yes
+        state: started
+      when: systemd_command.stat.exists
+    
+    - name: Give Service execute permission (init.d)
+      file: 
+        path: /etc/init.d/node_exporter
+        mode: 0755 
+      when: not systemd_command.stat.exists
+
+    - name: Enable Service with init.d
+      service:
+        name: node_exporter
+        enabled: yes
+        state: restarted
+      when: not systemd_command.stat.exists
+
+    - name: Enable iptables
+      iptables:
+        action: insert
+        chain: INPUT
+        protocol: tcp
+        destination_port: 9100
+        jump: ACCEPT
+    
+    - name: save iptable rules
+      service:
+        name: iptables
+        state: reloaded
